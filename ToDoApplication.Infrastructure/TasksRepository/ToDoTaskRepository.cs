@@ -1,39 +1,49 @@
 ﻿using ToDoApplication.Application.TaskRepository;
 using ToDoApplication.Domain.Exceptions;
 using ToDoApplication.Domain.Task;
+using ToDoApplication.Infrastructure.Database.DbContexts;
 
-namespace ToDoApplication.Infrastructure.TasksRepository;
-
-public class ToDoTaskRepository : IToDoTaskRepository
+namespace ToDoApplication.Infrastructure.TasksRepository
 {
-    public List<TodoTask> TodoTasks = [];
-
-    public void AddTask(TodoTask task)
+    public class ToDoTaskRepository : IToDoTaskRepository
     {
-        if (TodoTasks.Any(x => string.Equals(x.Id.ToString(), task.Id.ToString(), StringComparison.InvariantCulture)))
+        private readonly TaskDbContext _dbContext;
+
+        public ToDoTaskRepository(TaskDbContext dbContext)
         {
-            throw new RepeatedTaskIdException();
+            _dbContext = dbContext;
         }
 
-        TodoTasks.Add(task);
-    }
-
-    public IReadOnlyCollection<TodoTask> GetTasks()
-    {
-        return TodoTasks;
-    }
-
-    public void RemoveTask(string taskId)
-    {
-        var taskToRemove = TodoTasks.Find(x => string.Equals(x.Id.ToString(), taskId, StringComparison.InvariantCulture));
-
-        if (taskToRemove != null)
+        public void AddTask(TodoTask task)
         {
-            TodoTasks.Remove(taskToRemove);
+            if (_dbContext.TodoItems.Any(x => x.Id == task.Id))
+            {
+                throw new RepeatedTaskIdException();
+            }
+
+            _dbContext.TodoItems.Add(task);
+            _dbContext.SaveChanges();
         }
-        else
+
+        public IReadOnlyCollection<TodoTask> GetTasks()
         {
-            throw new TaskNotFoundException();
+            return _dbContext.TodoItems.ToList();
+        }
+
+        public void RemoveTask(string taskId)
+        {
+            var taskToRemove = _dbContext.TodoItems
+                .FirstOrDefault(x => x.Id.ToString() == taskId);
+
+            if (taskToRemove != null)
+            {
+                _dbContext.TodoItems.Remove(taskToRemove);
+                _dbContext.SaveChanges();
+            }
+            else
+            {
+                throw new TaskNotFoundException();
+            }
         }
     }
 }
